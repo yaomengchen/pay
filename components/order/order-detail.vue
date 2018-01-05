@@ -394,42 +394,82 @@
                     let val = JSON.parse(res.data)
                     let tel = val['STORE.CONTACT_PHONE']
                     let name = val['STORE.STORE_NAME']
-                    let obj = {
-                        'IS_OVER': 'true',
-                        'STORE_ORDER.MEMB_CARD_MONEY': self.order['STORE_ORDER.MEMB_CARD_MONEY'],
-                        'STORE_ORDER.OTHER_PAY_WAY_TYPE': self.order['STORE_ORDER.OTHER_PAY_WAY_TYPE'],
-                        'STORE_ORDER.OTHER_PAY_WAY_MONEY':self.order['STORE_ORDER.OTHER_PAY_WAY_MONEY'],
-                        'STORE_ORDER.MEMB_CARD_NUM': self.order['STORE_ORDER.MEMB_CARD_NUM'],
-                        'STORE_ORDER.MEMB_PHONE': self.order['STORE_ORDER.MEMB_PHONE'],
-                        'STORE_ORDER.UID':self.order['STORE_ORDER.UID'],
-                        'STORE_ORDER.USER_NAME': self.order['STORE_ORDER.USER_NAME'], 
-                        'STORE_ORDER.DISCOUNT_MONEY': self.order['STORE_ORDER.DISCOUNT_MONEY'],
-                        'STORE_ORDER.REMARK': self.order['STORE_ORDER.REMARK'],
-                        // 'STORE_ORDER.MEMB_CARD_INTEGRAL': self.member['MEMB_CARD.USABLE_POINT'],
-                        // 'STORE_ORDER.MEMB_CARD_BALANCE': self.member['MEMB_CARD.USABLE_MONEY'],
-                        'SERVICE_ID':self.order['STORE_ORDER.SERVICE_ID'],
-                        'ADD_TIME': self.order['STORE_ORDER.ADD_DATETIME'],
-                        'GATHER_MONEY':self.order['STORE_ORDER.OTHER_PAY_WAY_MONEY'],
-                        'ODD_CHANGE':'0',
-                        'STORE_NAME':name,
-                        'STORE_TEL':tel,
-                        'SORT_CODE':self.order['STORE_ORDER.SORT_CODE'],
-                        'STORE_ORDER.DISCOUNT_INFO_LIST':self.order['STORE_ORDER.DISCOUNT_INFO'],
-                        'STORE_ORDER.STORE_ORDER_DETAILS': self.order['STORE_ORDER.STORE_ORDER_DETAILS'],
-                        'SHOULD_PRINT_WIFI':-1
-                    }
-                    if(typeof(getEvent.frontPrint) == "function"){
-                        // getEvent.frontPrint(obj,function(res){})
-                        if(self.list.indexOf('front') != -1){
-                             getEvent.frontPrint(obj,function(res){})
+                    self.order['STORE_ORDER.DISCOUNT_INFO'].forEach(e=>{
+                        e['STORE_ORDER_DETAIL.SKU_NAME']= e['STORE_ORDER_DETAIL.PRD_NAME']
+                    })
+                    if(self.order['STORE_ORDER.ORDER_SOURCE'] == 'ELEME' || self.order['STORE_ORDER.ORDER_SOURCE'] == 'MEITUAN'){
+                        let source ='';
+                        if(self.order['STORE_ORDER.ORDER_SOURCE'] == 'ELEME'){
+                            source = '饿了么'
+                        }else if(self.order['STORE_ORDER.ORDER_SOURCE'] == 'MEITUAN'){
+                            source = '美团'
                         }
-                    }
-                    if(typeof(getEvent.backPrint) == "function"){
-                        if(self.list.indexOf('other') != -1){
-                             getEvent.backPrint(obj,function(res){})
+                        let obj = {
+                            'TYPE':'WEB',
+                            'STORE_ORDER.ORDER_SOURCE'       : source,
+                            'STORE_ORDER.GET_NUM'            : self.order['STORE_ORDER.GET_NUM'],
+                            'STORE_ORDER.STORE_NAME'         : name,
+                            'STORE_ORDER.STORE_PHONE'        : tel,
+                            // 送达时间
+                            'STORE_ORDER.DELIVERY_DATETIME'  : self.order['STORE_ORDER.DELIVERY_DATETIME'],
+                            'STORE_ORDER.ADD_DATETIME'       : self.order['STORE_ORDER.ADD_DATETIME'],
+                            'STORE_ORDER.ORDER_CODE'         : self.order['STORE_ORDER.ORDER_CODE'],
+                            'STORE_ORDER.REMARK'             : self.order['STORE_ORDER.REMARK'],
+                            'STORE_ORDER.STORE_ORDER_DETAILS': self.order['STORE_ORDER.STORE_ORDER_DETAILS'],
+                            'STORE_ORDER.SUM_MONEY'          : self.order['STORE_ORDER.SUM_MONEY'],
+                            'STORE_ORDER.DISCOUNT_MONEY'     : self.order['STORE_ORDER.DISCOUNT_MONEY'],
+                            'STORE_ORDER.DISTRIBUTION_MONEY' : self.order['STORE_ORDER.DISTRIBUTION_MONEY'],
+                            // 餐盒费
+                            'STORE_ORDER.PAID_MONEY'         : self.order['STORE_ORDER.PAID_MONEY'],
+                            'STORE_ORDER.PAID_MONEY'         : self.order['STORE_ORDER.PAID_MONEY'],
+                            'STORE_ORDER.UID'                : self.order['STORE_ORDER.UID'],
+                            'STORE_ORDER.ORDER_SOURCE_ADDR'  : self.order['STORE_ORDER.ORDER_SOURCE_ADDR'],
+                            'STORE_ORDER.USER_NAME'          : self.order['STORE_ORDER.USER_NAME'], 
+                            'STORE_ORDER.MEMB_PHONE'         : self.order['STORE_ORDER.MEMB_PHONE'], 
                         }
-                       
+                        if(typeof(getEvent.printFrontTakeOutInfo) == "function"){
+                            getEvent.printFrontTakeOutInfo(obj,function(res){})
+                        }
+                    }else{
+                        let obj = {
+                            'IS_OVER': 'true',
+                            'STORE_ORDER.MEMB_CARD_MONEY': self.order['STORE_ORDER.MEMB_CARD_MONEY'],
+                            'STORE_ORDER.OTHER_PAY_WAY_TYPE': self.order['STORE_ORDER.OTHER_PAY_WAY_TYPE'],
+                            'STORE_ORDER.OTHER_PAY_WAY_MONEY':self.order['STORE_ORDER.OTHER_PAY_WAY_MONEY'],
+                            'STORE_ORDER.MEMB_CARD_NUM': self.order['STORE_ORDER.MEMB_CARD_NUM'],
+                            'STORE_ORDER.MEMB_PHONE': self.order['STORE_ORDER.MEMB_PHONE'],
+                            'STORE_ORDER.UID':self.order['STORE_ORDER.UID'],
+                            'STORE_ORDER.USER_NAME': self.order['STORE_ORDER.USER_NAME'], 
+                            'STORE_ORDER.DISCOUNT_MONEY': self.order['STORE_ORDER.DISCOUNT_MONEY'],
+                            'STORE_ORDER.REMARK': self.order['STORE_ORDER.REMARK'],
+                            // 'STORE_ORDER.MEMB_CARD_INTEGRAL': self.member['MEMB_CARD.USABLE_POINT'],
+                            // 'STORE_ORDER.MEMB_CARD_BALANCE': self.member['MEMB_CARD.USABLE_MONEY'],
+                            'SERVICE_ID':self.order['STORE_ORDER.SERVICE_ID'],
+                            'ADD_TIME': self.order['STORE_ORDER.ADD_DATETIME'],
+                            'GATHER_MONEY':self.order['STORE_ORDER.OTHER_PAY_WAY_MONEY'],
+                            'ODD_CHANGE':'0',
+                            'STORE_NAME':name,
+                            'STORE_TEL':tel,
+                            'SORT_CODE':self.order['STORE_ORDER.SORT_CODE'],
+                            'STORE_ORDER.DISCOUNT_INFO_LIST':self.order['STORE_ORDER.DISCOUNT_INFO'],
+                            'STORE_ORDER.STORE_ORDER_DETAILS': self.order['STORE_ORDER.STORE_ORDER_DETAILS'],
+                            'SHOULD_PRINT_WIFI':-1
+                        }
+                        modal.alert({message:JSON.stringify(self.order)})
+                        if(typeof(getEvent.frontPrint) == "function"){
+                            // getEvent.frontPrint(obj,function(res){})
+                            if(self.list.indexOf('front') != -1){
+                                 getEvent.frontPrint(obj,function(res){})
+                            }
+                        }
+                        if(typeof(getEvent.backPrint) == "function"){
+                            if(self.list.indexOf('other') != -1){
+                                 getEvent.backPrint(obj,function(res){})
+                            }
+                           
+                        } 
                     }
+                    
                 })
                 
             },

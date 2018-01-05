@@ -45,7 +45,7 @@
                 input:false
             }
         },
-        props:['show'],
+        props:['show','num'],
         methods:{
             onSwipe(event) {
                 if(event.direction == 'up'){

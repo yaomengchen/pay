@@ -4,8 +4,8 @@
             <div class="toggle-order-mode-bar">
                 <div class="toggle-order-mode-bar-item" :class="[nowIndex==0?'toggle-order-mode-bar-item-active':'']" @click="toggleActiveHeader(0)">
                     <text class="toggle-order-mode-bar-item-text" >今日订单</text>
-                    <div class="pop" ref="webpop" v-if="webcount > 0">
-                        <text class="pop-text">{{webcount}}</text>  
+                    <div class="pop" ref="webpop" v-if="num > 0">
+                        <text class="pop-text">{{num}}</text>  
                     </div>
                 </div>
                 <div class="toggle-order-mode-bar-item" :class="[nowIndex==1?'toggle-order-mode-bar-item-active':'']" @click="toggleActiveHeader(1)">
@@ -21,8 +21,8 @@
         </div>
         <div class="item" v-if="render">
             <nothing :display="orderList.length"></nothing>
-            <orderList class="order-list body-item" :order-list="orderList" :focus-order="focusOrder" @change="change" @load="loadmore"></orderList>
-            <orderDetail class="order-detail body-item" :order="orderDetails" @printed="choosePrint" :list="printlist" ref="detail"  @cancel="chooseReason" @type="chooseType"  @agreeTip="getAgreeRefund" @rejectTip="getRejectRefund" :cancelbtn="cancelbtntext"></orderDetail>
+            <orderList class="order-list body-item" :order-list="orderList" :focus-order="focusOrder" :type="tabbarType" @change="change" @search="search"></orderList>
+            <orderDetail class="order-detail body-item" :order="orderDetails" @printed="choosePrint" :list="printlist"  :type="tabbarType" ref="detail"  @cancel="chooseReason" @type="chooseType"  @agreeTip="getAgreeRefund" @rejectTip="getRejectRefund" :cancelbtn="cancelbtntext"></orderDetail>
         </div>
         <!-- <div class="item" v-if="render &&  nowIndex ==1">
             <nothing :display="orderList.length"></nothing>
@@ -149,6 +149,8 @@
                     return:'/bee/store/order/return/bill/queryAllForApp?PAGE_SIZE=20&PN=',
                     all:'/bee/store/order/bill/queryAllForApp?PAGE_SIZE=20&PN='
                 },
+                //网单今日退单
+                webReturnApi      :'/bee/three/waimai/queryAllTodayCancelOrderByStore?SERVICE_ID=',
                 // 网单查询接口
                 webAllApi         :'/bee/three/waimai/queryAllOrderByStore?SERVICE_ID=',
                 // 饿了么卖家主动取消
@@ -171,7 +173,6 @@
                 displayCanc:false,
                 pageNumber:1,
                 printlist:[],
-                webcount:2,
                 cancelbtntext:'取消订单',
                 webTodayList:[],
                 webReturnList:[],
@@ -183,9 +184,10 @@
                 orderDetailObj:{},
                 pageNumber:0,
                 webAllList:[],
+                tabbarType:'today'
             }
         },
-        props:['count','todaylist','returnlist','alllist','serviceid','storeid'],
+        props:['count','todaylist','returnlist','alllist','serviceid','storeid','num'],
         components: {
             orderList,
             orderDetail,
@@ -198,14 +200,17 @@
         computed: {
             orderList(){
                 if(this.nowIndex == 0){
+                    this.tabbarType = 'today'
                     return this.todaylist
                 }else if(this.nowIndex == 1){
                     // this.orderlist = this.returnlist
                     // this.getOrder(0);
+                    this.tabbarType = 'return'
                     return this.returnlist
                 }else if(this.nowIndex == 2){
                     // this.orderlist = this.webAllList
                     // this.getOrder(0);
+                    this.tabbarType = 'all'
                     return this.webAllList
                 }
             },
@@ -215,8 +220,28 @@
             }
         },
         methods: {
+            // 今日退单查询
+            webReturnQuery(list){
+              let self = this;
+              stream.fetch({
+                method: 'GET',
+                url: self.webReturnApi+ self.serviceid + '&STORE_ID=' + self.storeid,
+                type:'json'
+              }, function(res) {
+                if(res.extraData['TODAY_CANCEL_ORDER_LIST']){
+                    res.extraData['TODAY_CANCEL_ORDER_LIST'].forEach(ele=>{
+                      self.webReturnList.push(res.extraData['TODAY_CANCEL_ORDER_LIST'])
+                    })
+                }
+                if(list){
+                    self.getOrder(self.webReturnList,0)
+
+                }
+              })
+            },
+            // 今日退单查询
             // 全部订单查询
-            webALLQuery(){
+            webALLQuery(list){
               let self = this,
                   sum  = 0,
                   type = 0,
@@ -226,17 +251,14 @@
                 url: self.webAllApi + self.serviceid + '&STORE_ID=' + self.storeid + "&PAGE_SIZE=20&PN="+self.pageNumber,
                 type: 'json'
               },res =>{
-                if(self.webAllList['SUM']){
-                    sum = self.webAllList['SUM']
-                }
+                console.log(res.extraData)
                 res.extraData['ALL_ORDER_LIST'].forEach(e=>{
-                    sum += parseFloat(e['STORE_ORDER.SUM_MONEY'])
                     self.webAllList.push(e)
                 })
+                if(list){
+                    self.getOrder(self.webAllList,0)
+                }
              })
-            self.webAllList['SUM'] = sum
-            self.webAllList['TYPE'] = self.webAllList.length;
-
             },
             // 全部订单查询
             loadmore(){
@@ -273,12 +295,12 @@
                         'method':'POST',
                         'url':url  + self.serviceid + '&STORE_ID=' + self.storeid + '&CANCEL_TYPE='+type+'&CANCEL_REASON='+ encodeURI(reason) +'&ORDER_ID='+ self.cancelId 
                     },res=>{
-                        if(self.pageNumber == 1){
-                            self.orderList = res.data
-                            self.order = self.getOrder(this.focusOrder)
-                        }else{
-                            self.orderList = self.orderList.concat(res.data)
-                        }                                        
+                        self.todaylist.forEach(e=>{
+                             if(e['STORE_ORDER.ORDER_ID'] == self.cancelId ){
+                                e['STORE_ORDER.STATE'] = 'CANCEL'
+                             }
+                        })
+                        // self.order = self.getOrder(this.focusOrder)
                         self.render ? '' : (self.render = true)
                         self.cancelbtntext = '已取消';
 
@@ -322,20 +344,26 @@
             },
             change(res){
                 this.focusOrder = res
+                console.log(this.nowIndex)
                 if(this.nowIndex == 3){
                     this.pendingOrder = this.wait[res]
                 }else if(this.nowIndex == 4){
                     this.faildOrder = this.fail[res]
-                }else{this.order = this.getOrder(res)
+                }else if(this.nowIndex == 0){
+                    this.order = this.getOrder(this.todaylist,res)
+                }else if(this.nowIndex == 1){
+                    this.order = this.getOrder(this.webReturnList,res)
+                }else if(this.nowIndex == 2){
+                    this.order = this.getOrder(this.webAllList,res)
                 }
             },
-            getOrder(index){
+            getOrder(list,index){
                 let self = this 
                 var arr = []
                 var sum = 0;
                 var result = [];
-                if(self.orderList[index]){
-                    let id = self.orderList[index]['STORE_ORDER.ORDER_ID']
+                if(list[index]){
+                    let id = list[index]['STORE_ORDER.ORDER_ID']
                     stream.fetch({
                       method:"GET",
                       url:self.orderDetail + id,
@@ -343,8 +371,6 @@
                     },res=>{
                         self.orderDetailObj = res.data[0];
                         for(let i in this.orderDetailObj['STORE_ORDER.STORE_ORDER_DETAILS']){
-                            console.log(1111)
-                            console.log(this.orderDetailObj['STORE_ORDER.STORE_ORDER_DETAILS'][i]['STORE_ORDER_DETAIL.COUNT'])
                             sum += parseFloat(this.orderDetailObj['STORE_ORDER.STORE_ORDER_DETAILS'][i]['STORE_ORDER_DETAIL.COUNT'])
                             arr.push(this.orderDetailObj['STORE_ORDER.STORE_ORDER_DETAILS'][i])
                         }
@@ -364,28 +390,23 @@
                     if(self.nowIndex == 0){
                         if(self.todaylist.length > 0){
                             self.orderList == self.todaylist
-                            self.getOrder(0)
+                            self.getOrder(self.orderList,0)
                         }else{
                             self.orderDetailObj = {}
                         }
                     }else if(self.nowIndex == 1){
                         if(self.returnlist.length > 0){
-                            self.orderList == self.returnlist
-                            self.getOrder(0)
+                            self.webReturnQuery(true)
                         }else{
                             self.orderDetailObj = {}
                         }
                     }else if(self.nowIndex == 2){
                         if(self.webAllList.length > 0){
                             self.pageNumber = 1
-                            self.webALLQuery()
-                            self.orderList == self.webAllList
-                            self.getOrder(0)
+                            self.webALLQuery(true)
                         }else{
                             self.orderDetailObj = {}
                         }
-                        
-
                     }
                     // self.focusOrder = 0
                     // 3、4为同步中/同步失败
@@ -459,6 +480,39 @@
                     })
                 }
                
+            },
+            // 搜索
+            search(key){
+                let self = this,
+                api = '';
+                self.pageNumber = 1;
+                if(self.nowIndex == 0){
+                    self.webTodayApi + self.serviceid + '&STORE_ID=' + self.storeid+"&SEARCH="+key
+                }else if(self.nowIndex == 1){
+                    stream.fetch({
+                        method: 'GET',
+                        url: self.webReturnApi+ self.serviceid + '&STORE_ID=' + self.storeid+"&SEARCH="+key,
+                        type:'json'
+                      }, function(res) {
+                        if(res.extraData['TODAY_CANCEL_ORDER_LIST']){
+                            res.extraData['TODAY_CANCEL_ORDER_LIST'].forEach(ele=>{
+                              self.webReturnList.push(res.extraData['TODAY_CANCEL_ORDER_LIST'])
+                            })
+                        }
+                    })
+                }else if(self.nowIndex == 2){
+                    stream.fetch({
+                        method: 'GET',
+                        url: self.webAllApi + self.serviceid + '&STORE_ID=' + self.storeid + "&PAGE_SIZE=20&PN="+self.pageNumber+"&SEARCH="+key,
+                        type:'json'
+                      }, function(res) {
+                        if(res.extraData['TODAY_CANCEL_ORDER_LIST']){
+                            res.extraData['TODAY_CANCEL_ORDER_LIST'].forEach(ele=>{
+                              self.webReturnList.push(res.extraData['TODAY_CANCEL_ORDER_LIST'])
+                            })
+                        }
+                    })
+                }
             },
 
         }

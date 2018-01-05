@@ -3,7 +3,7 @@
             <div class="search-bar-container">
                 <div class="search-bar">
                     <image class="search-icon" src="1"></image>
-                    <input type="tel" class="search-bar-type-in" placeholder="请输入姓名或卡号" v-model="searchKey" @input='searchOrderList'/>
+                    <input type="tel" class="search-bar-type-in" placeholder="请输入姓名或卡号" v-model="searchKey" @input='searchOrderList'  return-key-type="search"/>
                 </div>
             </div>       
             <scroller class="list-area-container" loadmoreoffset="10" @loadmore="loadmore">
@@ -11,9 +11,8 @@
                     <div class="item-bar"></div>
                     <div class="list">
                         <div class="list-item" v-for="(order,orderIndex) in orderList" :class="[(orderIndex==orderList.length-1)?'list-item-last':'']" @click="toggleActiveItem(orderIndex)">
-                            
                             <div class="dot-sign-container">
-                                <image class="dot-sign" :src="order['STORE_ORDER.OPERATOR_NAME'] == 'meituan'?meituanIcon:elmIcon"></image>
+                                <image class="dot-sign" :src="order['STORE_ORDER.ORDER_SOURCE'] == 'MEITUAN'?meituanIcon:elmIcon"></image>
                             </div>
                             <div class="list-item-true-area" :class="[focusOrder===orderIndex?'list-item-true-area-active':'']">
                                 <image class="order-return-icon" :src="returnIcon" v-if="order['STORE_ORDER.STATE'] == 'WAIT_CANCEL'||order['STORE_ORDER.STATE'] == 'CANCEL'"></image>
@@ -39,7 +38,7 @@
                     
                 </div>
             </scroller>
-        <div class="billings-area">
+        <div class="billings-area" v-if="type == 'today'">
             <div class="pay-right-now" @click='submit'>
                 <div style="flex-direction:row;align-items:center;">
                     <text class="pay-right-now-text">共  </text>
@@ -249,14 +248,13 @@
         filters:{
             price:filters.price
         },
-        props:['orderList','focusOrder'],
+        props:['orderList','focusOrder','type'],
         methods: {
             toggleActiveItem (index) {
-
                 this.$emit('change',index)
             },
             searchOrderList () {
-                searchDbc(this)
+                this.$emit('search',this.searchKey)
             },
             loadmore(){
                 this.$emit('load','')

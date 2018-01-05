@@ -14,7 +14,7 @@
                 <input type="password" class="input" placeholder="密码" v-model="password"  return-key-type="defalut" @return = "login"/>
             </div>
             <div class="btn-message" @click='login' ref="btn">
-                <text class="whiteText" v-if="!islogin">登    录1</text>
+                <text class="whiteText" v-if="!islogin">登    录</text>
                 <text class="whiteText" v-if="islogin">登    录    中 ...</text>
             </div>
             
@@ -26,7 +26,9 @@ import modal from './common/modal.js'
 import stream from './common/stream.js'
 const animation = weex.requireModule('animation')
 const storage = weex.requireModule('storage')
+const notiEvent = weex.requireModule('notiEvent')
 import navigator from './common/navigator.js'
+
 export default {
     data () {
         return {
@@ -37,6 +39,8 @@ export default {
             debugTips: '',
             passNum: 0,
             aftertype:'',
+            channelId:'',
+            type     :'',
             testApi:'http://118.190.74.62:12019/jiaorder/bubu',
             workApi:'http://aa.eerrpp.cc/boloogo/bubu',
             apiHost: 'http://aa.eerrpp.cc/boloogo/bubu',
@@ -50,6 +54,13 @@ export default {
     },
     created(){
         let self = this
+        // ios获取设备id,方法获取，安卓是存在本地CHANNEL_ID
+        if(typeof(notiEvent.getChannelId) == "function"){
+            notiEvent.getChannelId('channelid',function(val){
+              self.channelId = val
+              self.type = 'IOS_1006'
+            })
+        }
         storage.getItem('login_info',res=>{
             if(res.result == 'success'){
                 self.userId = JSON.parse(res.data).userId
@@ -108,7 +119,7 @@ export default {
                 self.islogin = true
                 stream.fetch({
                     method: 'GET',
-                    url:'/bee/user/user/loginByApp?APP_TOKEN=9C4F2C2F67E34BB29BF296DBDBF26922&USER.LOGIN_ID='+ self.userId + '&USER.LOGIN_PASSWORD='+ self.password,
+                    url:'/bee/user/user/loginByApp?APP_TOKEN=9C4F2C2F67E34BB29BF296DBDBF26922&USER.LOGIN_ID='+ self.userId + '&USER.LOGIN_PASSWORD='+ self.password+"&DEVICE_NO="+self.channelId+"&DEVICE_TYPE="+self.type,
                     type: 'json'
                 },res => {
                     if(res.code === 0){
@@ -156,6 +167,19 @@ export default {
             }
 
         },
+            /*
+          提交的表单数据  进行字符串转化
+          */
+          param: function(data) {
+            var result = "";
+            for (var attr in data) {
+              if (data.hasOwnProperty(attr)) {
+                result += attr + "=" + data[attr] + "&";
+              }
+            }
+            result = result.substr(0, result.length - 1);  
+            return result;
+          },
             /*
             新增
             ymc 2017年12月25日17:48:02

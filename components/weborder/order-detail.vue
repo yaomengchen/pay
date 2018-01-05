@@ -109,22 +109,22 @@
             <div class="confirm-group-item reject-all-btn">
                 <text class="confirm-group-item-text">退货退款</text>
             </div> --> 
-            <div class="confirm-group-item reject-all-btn" @click="cancel">
+            <div class="confirm-group-item reject-all-btn" @click="cancel"  v-if="order['STORE_ORDER.STATE'] != 'WAIT_CANCEL' && type == 'today'">
                 <text class="confirm-group-item-text">{{cancelbtn}}</text>
             </div>
-            <div class="confirm-group-item print-btn" @click="print">
+            <div class="confirm-group-item print-btn" @click="goprint">
                 <text class="confirm-group-item-text print-btn-text">打印</text>
             </div>
         </div>
         <div class="confirm-group" v-if="order['STORE_ORDER.STATE'] == 'WAIT_CANCEL'">
             
-            <div class="confirm-group-item reject-all-btn" @click="agreeRefund">
+            <div class="confirm-group-item reject-all-btn" @click="agreeRefund"  v-if="order['STORE_ORDER.STATE'] == 'WAIT_CANCEL'&&type == 'today'">
                 <text class="confirm-group-item-text">同意取消</text>
             </div> 
-            <div class="confirm-group-item reject-all-btn" @click="rejectRefund">
+            <div class="confirm-group-item reject-all-btn" @click="rejectRefund"  v-if="order['STORE_ORDER.STATE'] == 'WAIT_CANCEL'&&type == 'today'">
                 <text class="confirm-group-item-text">拒绝</text>
             </div>
-            <div class="confirm-group-item print-btn" @click="print">
+            <div class="confirm-group-item print-btn" @click="goprint">
                 <text class="confirm-group-item-text print-btn-text">打印</text>
             </div>
         </div>
@@ -459,7 +459,7 @@
                 // cancelbtn:'取消订单',
             }
         },
-        props:['order','printed','list','cancelbtn'],
+        props:['order','printed','list','cancelbtn','type'],
         filters:{
             price:filters.price
         },
@@ -469,10 +469,10 @@
             }
         },
         methods:{
-            print(){
-                var self = this
-                self.$emit('printed',true);
-            },
+            // print(){
+            //     var self = this
+            //     self.$emit('printed',true);
+            // },
             cancel(){
                 // switch(this.cancelbtn)
                 // {
@@ -495,12 +495,13 @@
                 // storage.getItem('store_info',res =>{
                     let source ='';
                     if(self.order['STORE_ORDER.ORDER_SOURCE'] == 'ELEME'){
-                        source = encodeURI('饿了么')
+                        source = '饿了么'
                     }else if(self.order['STORE_ORDER.ORDER_SOURCE'] == 'MEITUAN'){
-                        source = encodeURI('美团')
+                        source = '美团'
                     }
                     let obj = {
-                        'STORE_ORDER.ORDER_SOURCE'       : self.order['STORE_ORDER.ORDER_SOURCE'],
+                        'TYPE':'WEB',
+                        'STORE_ORDER.ORDER_SOURCE'       : source,
                         'STORE_ORDER.GET_NUM'            : self.order['STORE_ORDER.GET_NUM'],
                         'STORE_ORDER.STORE_NAME'         : self.order['STORE_ORDER.STORE_NAME'],
                         'STORE_ORDER.STORE_PHONE'        : self.order['STORE_ORDER.MEMB_CARD_NUM'],
@@ -521,20 +522,18 @@
                         'STORE_ORDER.USER_NAME'          : self.order['STORE_ORDER.USER_NAME'], 
                         'STORE_ORDER.MEMB_PHONE'         : self.order['STORE_ORDER.MEMB_PHONE'], 
                     }
-                    modal.alert({message:typeof(getEvent.printFrontTakeOutInfo)})
-                    
                     if(typeof(getEvent.printFrontTakeOutInfo) == "function"){
                         getEvent.printFrontTakeOutInfo(obj,function(res){})
                         // if(self.list.indexOf('front') != -1){
                         //      getEvent.printFrontTakeOutInfo(obj,function(res){})
                         // }
                     }
-                    if(typeof(getEvent.backPrint) == "function"){
-                        if(self.list.indexOf('other') != -1){
-                             getEvent.backPrint(obj,function(res){})
-                        }
+                    // if(typeof(getEvent.backPrint) == "function"){
+                    //     if(self.list.indexOf('other') != -1){
+                    //          getEvent.backPrint(obj,function(res){})
+                    //     }
                        
-                    }
+                    // }
                 // })
                 
             },

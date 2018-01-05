@@ -17,7 +17,7 @@
         </div>
         <!-- 网单 -->
         <div class="pageItem">
-          <weborder ref="weborder"  @renderOrder="renderOver"  :todaylist="webAllTodayList" :returnlist="webAllReturnList" :serviceid="serviceId" :storeid="storeId"></weborder> 
+          <weborder ref="weborder"  @renderOrder="renderOver"  :todaylist="webAllTodayList" :returnlist="webAllReturnList" :serviceid="serviceId" :storeid="storeId" :num="cancelNum"></weborder> 
         </div>
         <!-- 网单 -->
       </div>
@@ -61,7 +61,7 @@
     <!-- <renderTip :render="render"></renderTip> -->
     <dataLoading :loading="loading"></dataLoading>
     <bigInput @event="inputEvent" ref="input"></bigInput>
-    <cancelTip @cancel="cancelOrder" :show="displayCanc" @click="switchPage(4)" :num="cancelNum"></cancelTip>
+    <cancelTip @cancel="cancelOrder" :show="displayCanc" @click="switchPage(4)"></cancelTip>
     <userMessage :dis="displayMes" @close="goLogin"></userMessage>
 
   </div>
@@ -185,10 +185,11 @@ import change from './components/change/change.vue'
     import format from './common/format.js'
 
     const animation = weex.requireModule('animation')
-    
+    const getEvent = weex.requireModule('event')
     const storage = weex.requireModule('storage')
     const globalEvent = weex.requireModule('globalEvent');
     const blueScanEvent = weex.requireModule('blueScanEvent');
+    const instanceEvent = weex.requireModule('instanceEvent')
     const tabBarIcons = icons.tabBarIcons
 
     export default{
@@ -210,7 +211,7 @@ import change from './components/change/change.vue'
                 // 网单今日订单
                 webTodayApi       :'/bee/three/waimai/queryAllTodayOrderByStore?SERVICE_ID=',
                 //网单今日退单
-                webReturnApi      :'/bee/three/waimai/queryAllTodayReturnOrderByStore?SERVICE_ID=',
+                webReturnApi      :'/bee/three/waimai/queryAllTodayCancelOrderByStore?SERVICE_ID=',
                 // 详情查询
                 webNewQueryApi    :'/bee/store/order/bill/getById?STORE_ORDER.ORDER_ID=',
                 
@@ -220,26 +221,37 @@ import change from './components/change/change.vue'
                 loading:false,
                 input: false,
                 startTime:'',
+
                 configList: [
-                {
-                  name:'index',isrefresh:false,isRender:true
-                },
-                {
-                  name:'order',isrefresh:true,isRender:false
-                },
-                {
-                  name:'member',isrefresh:true,isRender:false
-                },
-                {
-                  name:'change',isrefresh:true,isRender:false                  
-                },
+                  {
+                    name:'index',isrefresh:false,isRender:true
+                  },
+                  {
+                    name:'order',isrefresh:true,isRender:false
+                  },
+                  {
+                    name:'member',isrefresh:true,isRender:false
+                  },
+                  {
+                    name:'change',isrefresh:true,isRender:false                  
+                  },
                   //网单
                   {
                     name:'weborder',isrefresh:true,isRender:false                  
                   }
                   //网单
-                  
                   ],
+                  // 推送订单状态
+                  waimaiState:{
+                    'WAIMAI_ELEME.CANCEL'     :'CANCEL',
+                    'WAIMAI_ELEME.DONE'       :'DONE',
+                    'WAIMAI_ELEME.WAIT_CANCEL':'WAIT_CANCEL',
+                    'WAIMAI_ELEME.NEW_ORDER '      :'WAIT ',
+                    'WAIMAI_MEITUAN.CANCEL'      :'CANCEL',
+                    'WAIMAI_MEITUAN.DONE'        :'DONE',
+                    'WAIMAI_MEITUAN.WAIT_CANCEL' :'WAIT_CANCEL',
+                    'WAIMAI_MEITUAN.NEW_ORDER'   :'WAIT'
+                  },
                   waitSubmitList:[],
                   errorSubmitList:[],
                   pending: false,
@@ -258,6 +270,9 @@ import change from './components/change/change.vue'
                   webTodayReturnList:[],
                   cancelNum:"",
                   allPageNum:'',
+                  goQuery:true,
+                  webReturnOrderId:[],
+                  storeTel:'',  
                 }
               },
               created(){
@@ -266,13 +281,20 @@ import change from './components/change/change.vue'
                 self.webReturnQuery()
                 self.webIdQuery();
                 self.webToday = format.format().substr(0,10)
-                if(blueScanEvent){
-            // if(typeof globalEvent.addEventListener == 'function'){
-              blueScanEvent.listenBlueScan() 
-              blueScanEvent.setInputFocus()        
-              globalEvent.addEventListener("blueScanInfo", function (e) {
-               self.$refs.index.scanEvent(e.info)
-             });             
+                if(typeof(instanceEvent.setInstanceMap) == 'function'){
+                  instanceEvent.setInstanceMap("MAIN_INSTANCE");
+                }
+                // if(blueScanEvent){
+                if(typeof globalEvent.addEventListener == 'function'){
+                  blueScanEvent.listenBlueScan() 
+                  blueScanEvent.setInputFocus()  
+                  globalEvent.addEventListener("globalBai", function(e){
+                    self.read(e)
+                  });      
+                  globalEvent.addEventListener("blueScanInfo", function (e) {
+                    self.$refs.index.scanEvent(e.info)
+                  
+                 });             
             }      
           },
           mounted(){
@@ -280,8 +302,8 @@ import change from './components/change/change.vue'
             this.render = true;
             storage.getItem('store_info',res=>{
               let val = JSON.parse(res.data)
-              self.storeId   = '1048'
-            // self.storeId   = val['STORE.STORE_ID']
+            self.storeId   = val['STORE.STORE_ID']
+            self.storeTel  = val['STORE.CONTACT_PHONE']
             self.storeName = val['STORE.STORE_NAME']
             self.serviceId = val['STORE.SERVICE_ID']
             /*
@@ -298,17 +320,6 @@ import change from './components/change/change.vue'
                   })
                 },res=>{})
 
-            // 读取网单存储的数据
-            // storage.getItem(self.storeId + 'web_new_order',res=>{
-            //   if(res.result == 'success'){
-            //     self.webBigId = JSON.parse(res.data)[0]
-                
-            //   }
-            //   self.webTodayQuery()
-            //   self.webReturnQuery()
-            //   self.webALLQuery()
-            // })
-
             storage.getItem(self.storeId+'order_list',res =>{
               if(res.result == 'success'){
 
@@ -323,13 +334,6 @@ import change from './components/change/change.vue'
 
               }
             })
-            // 获取最大id
-            // storage.getItem(self.storeId+'web_new_order',res =>{
-            //   if(res.result == 'success'){
-            //     self.webBigId = JSON.parse(res.data['ordbig'])
-            
-            //   }
-            // })
             
             storage.getItem(self.storeId + 'work_start_time',res =>{
               if(res.result == 'success' && res.data != 'false'){
@@ -348,12 +352,15 @@ import change from './components/change/change.vue'
             webAllTodayList(){
             // return this.webTodayList
             if(this.webNewList){
-              this.webNewList.forEach(ele=>{
-                this.webTodayList['SUM'] += parseFloat(ele['STORE_ORDER.SUM_MONEY'])
-              })
               this.webNewList.forEach(e=>{
-               this.webTodayList.push(e)
+                if(this.webAllOrderId.indexOf(e['STORE_ORDER.ORDER_ID']) == -1){
+                  this.webTodayList.unshift(e)
+                  this.goprint(e)
+                  this.webAllOrderId.unshift(e['STORE_ORDER.ORDER_ID']) 
+                  this.webTodayList['SUM'] += parseFloat(e['STORE_ORDER.SUM_MONEY'])
+                }
               })
+              
                this.webTodayList['TYPE'] = this.webTodayList.length
               return this.webTodayList
             }else{
@@ -375,15 +382,22 @@ import change from './components/change/change.vue'
           },
           webReturnTip(){
           	let self = this;
-          	for (var i = 0; i < self.webReturnList.length; i++) {
-              if (self.webReturnList[i]['STORE_ORDER.STATE'] === 'WAIT_CANCEL') {
-                self.webTodaylist.splice(i, 1);
-                return true;
-                break
+            let num  = 0  
+                
+            if(self.webReturnList){
+              for (var i = 0; i < self.webReturnList.length; i++) {
+                if (self.webReturnList[i]['STORE_ORDER.STATE'] === 'WAIT_CANCEL') {
+                  self.webTodayList.splice(i, 1);
+                  return true;
+                  break
+                }else{
+                  num++
+                }
+                if(num == self.webReturnList.length){
+                  return false;
+                }
               }
-              return false
             }
-            
           },
           // webTodayAllList(){
           //   return this.webNewList.concat(this.webTodayList)
@@ -401,6 +415,15 @@ import change from './components/change/change.vue'
               }
 
             },
+            // webTodayList(){
+            //   let id = this.webBigId
+            //   if(this.webTodayList){
+            //     if(this.webOrderId[0] != id){
+            //        this.webBigId = this.webOrderId[0]
+            //     }
+            //     // this.webIdQuery()
+            //   }
+            // },
           /*
             此观察者检测的是  改变pending(开关)观察者的状态 判断订单数组是否为空 当数组为空的时候  就把开关关闭  数组不为空的时候把开关打开
             */
@@ -432,6 +455,35 @@ import change from './components/change/change.vue'
             cancelTip
           },
           methods: {
+            read:function(e){
+              var self = this,
+                  arr  = '',
+                  type = '';
+              arr  = e['key']['CURRENT_ID']
+              type = e['key']['CURRENT_TYPE']
+              if(self.webAllOrderId.indexOf(arr) == -1 && self.waimaiState[type] == 'WAIT'){
+                self.webNewQuery(e)
+                // self.webTodayList.unshift(e)
+                // self.goprint(e)
+                // self.webAllOrderId.unshift(e['STORE_ORDER.ORDER_ID']) 
+                // self.webTodayList['SUM'] += parseFloat(e['STORE_ORDER.SUM_MONEY'])
+              }else if(self.webAllOrderId.indexOf(arr) != -1 && self.waimaiState[type] == 'WAIT_CANCEL'){
+                for (var i = 0; i < self.webTodayList.length; i++) { 
+                  if (self.webTodayList[i]['STORE_ORDER.ORDER_ID'] === ele['STORE_ORDER.ORDER_ID']) {
+                    self.webTodayList.splice(i, 1);
+                    self.webTodayList.unshift(ele);
+                    break;
+                  }
+                }
+              }else if(self.webAllOrderId.indexOf(arr) != -1){
+                for (var i = 0; i < self.webTodayList.length; i++) { 
+                  if (self.webTodayList[i]['STORE_ORDER.ORDER_ID'] === ele['STORE_ORDER.ORDER_ID']) {
+                    self.webTodayList['STORE_ORDER.STATE'] = self.waimaiState[type];
+                    break;
+                  }
+                }
+              }
+            },
             // 网单轮询接口
             // 网单id查询
             webIdQuery(){
@@ -440,9 +492,9 @@ import change from './components/change/change.vue'
               meituan = [],
               cancel  = [],
               done    = [],
-              arrlist = [];
-              console.log(self.webBigId)
-              self.webBigId = '1827'
+              arrlist = [],
+              canclist= [];
+              self.webBigId = 1954
               stream.fetch({
                 method: 'GET',
                 url: self.webQueryApi + self.serviceId + '&STORE_ID=' + self.storeId +'&LAST_ORDER_ID=' + self.webBigId,
@@ -465,26 +517,31 @@ import change from './components/change/change.vue'
                     })
                     // arrlist.concat(meituan)
                  }
-                if(res.extraData['NEW_ORDER']['RETURN']){
-                  self.webNewQuery(res.extraData['NEW_ORDER']['RETURN']);
-                }
                 arrlist.sort(self.sortNum)
+               
                  if(arrlist.length > 0){
                   self.webBigId = arrlist[0];
-                  self.webNewQuery(arrlist);
+                  self.webNewQuery(arrlist,false);
                  }
+                if(res.extraData['APPLY_CANCEL_ORDER']['ELEME']){
+                  res.extraData['APPLY_CANCEL_ORDER']['ELEME'].forEach(e=>{
+                      canclist.push(e)
+                    })
+                }
+                if(res.extraData['APPLY_CANCEL_ORDER']['MEITUAN']){
+                  res.extraData['APPLY_CANCEL_ORDER']['MEITUAN'].forEach(e=>{
+                      canclist.push(e)
+                    })
+                }
+                if(canclist.length > 0){
+                  self.webNewQuery(canclist,true);
+                }
               };
               // 轮询新订单
               // 轮询取消订单状态
                 if(res.extraData['CANCEL']){
                   cancel = res.extraData['CANCEL'];
-                  if(cancel.length > 0 && self.webReturnList.length > 0){
-                    self.webReturnList.forEach(e=>{
-                      if(cancel.indexOf(e['STORE_ORDER.ORDER_ID']) != -1){
-                        e['STORE_ORDER.STATE'] = 'CANCEL'
-                      }
-                    })
-                  }
+                  self.changeState(self.webReturnList,cancel,'CANCEL')
                 };
 
               // 轮询取消订单状态
@@ -492,98 +549,117 @@ import change from './components/change/change.vue'
               if(res.extraData['DONE']){
                   done = res.extraData['DONE'];
                   if(done.length > 0 && self.webReturnList.length > 0){
-                    self.webTodayList.forEach(e=>{
-                      if(done.indexOf(e['STORE_ORDER.ORDER_ID']) != -1){
-                        e['STORE_ORDER.STATE'] = 'DONE'
-                      }
-                    })
+                    self.changeState(self.webTodayList,done,'DONE')
                   }
                 };
               // 轮询完结订单状态
             },res1 =>{
-              setTimeout(()=>{
-                self.webIdQuery()
-              },30000)
+              // if(self.goQuery){
+                setTimeout(()=>{
+                  self.webIdQuery()
+                },6000)
+              // }
             })
             },
             // 网单id查询
-            webNewQuery(webOrderId){
+            webNewQuery(webOrderId,state){
               let self = this;
               let webOrderIdCopy = webOrderId.join(',')
-              stream.fetch({
-                method: 'GET',
-                url: self.webNewQueryApi + webOrderIdCopy,
-                type: 'json'
-              },res =>{
-                console.log(res)
-                	//退单判断
-                	res.extraData['TODAY_ORDER_LIST'].forEach(ele=>{
-                		// 等待订单取消
-                		if(ele['STORE_ORDER.STATE'] == 'WAIT_CANCEL'){
-                			self.webReturnList.unshift(ele)
-                			for (var i = 0; i < self.webTodaylist.length; i++) {
-                        if (self.webTodaylist[i]['STORE_ORDER.ORDER_ID'] === ele['STORE_ORDER.ORDER_ID']) {
-                         self.webTodaylist.splice(i, 1);
-                         break;
-                       }
-                     }
-                      self.webTodaylist.unshift(ele);
-                    }
-                  })
-                	if(self.webTodayReturnList.length > 0){
-                		self.cancelNum = self.webTodayReturnList.length ;
-                		self.displayCanc = true;
-                	} 
-                  self.webNewList = res.extraData['TODAY_ORDER_LIST']
-                  // self.webNewList.concat(self.webTodaylist)
-                })
+              self.getData(self.webNewQueryApi + webOrderIdCopy,self.webNewQueryApi,state)
             },
             // 网单轮询接口
             
             // 今日网单查询
             webTodayQuery(){
-              let self = this,
-                  sum  = 0,
-                  type = 0;
-              stream.fetch({
-                method: 'GET',
-                url: self.webTodayApi + self.serviceId + '&STORE_ID=' + self.storeId,
-                type: 'json'
-              },res =>{
-                res.extraData['TODAY_ORDER_LIST'].forEach(ele=>{
-                  self.webAllOrderId.push(ele['STORE_ORDER.ORDER_ID'])
-                  sum+= parseFloat(ele['STORE_ORDER.SUM_MONEY'])
-                })
-                if(self.webAllOrderId.length > 0 ){
-                  self.webAllOrderId.sort(self.sortNum)
-                  self.webBigId   = self.webAllOrderId[0];
-                }else{
-                  self.webBigId   = 0;
-                }
-                self.webTodayList = res.extraData['TODAY_ORDER_LIST'];
-                self.webTodayList['SUM'] = sum
-
-              })
+              let self = this;
+              self.getData(self.webTodayApi + self.serviceId + '&STORE_ID=' + self.storeId,self.webTodayApi)
             },
             // 今日网单查询
             // 今日退单查询
             webReturnQuery(){
               let self = this;
-              stream.fetch({
-                method: 'GET',
-                url: self.webReturnApi + self.serviceId + '&STORE_ID=' + self.storeId,
-                type: 'json'
-              },res =>{
-              	res.extraData['TODAY_ORDER_LIST']
-                self.webReturnList = res.extraData['TODAY_ORDER_LIST']
-              })
+              self.getData(self.webReturnApi + self.serviceId + '&STORE_ID=' + self.storeId,self.webReturnApi)
             },
             // 今日退单查询
+            getData(url,defaultUrl,state){
+              let self = this,
+                  sum  = 0,
+                  num  = 0,
+                  type = 0,
+                  result = [];
+              stream.fetch({
+                method: 'GET',
+                url: url,
+                type:'json'
+              }, function(res) {
+                // 今日订单
+                if(defaultUrl ==  self.webTodayApi){
+                  if(res.extraData['TODAY_ORDER_LIST']){
+                    res.extraData['TODAY_ORDER_LIST'].forEach(ele=>{
+                      self.webAllOrderId.push(ele['STORE_ORDER.ORDER_ID'])
+                      sum+= parseFloat(ele['STORE_ORDER.SUM_MONEY'])
+                    })
+                    if(self.webAllOrderId.length > 0 ){
+                      self.webAllOrderId.sort(self.sortNum)
+                      self.webBigId   = self.webAllOrderId[0];
+                    }else{
+                      self.webBigId   = 0;
+                    }
+                    self.webTodayList = res.extraData['TODAY_ORDER_LIST'];
+                    self.webTodayList['SUM'] = sum
+                  }
+                }
+                // 今日退单
+                else if(defaultUrl ==  self.webReturnApi){
+                  if(res.extraData['TODAY_CANCEL_ORDER_LIST']){
+                    res.extraData['TODAY_CANCEL_ORDER_LIST'].forEach(ele=>{
+                      num ++
+                      self.webReturnOrderId.push(ele['STORE_ORDER.ORDER_ID'])
+                    })
+                    self.cancelNum = num;
+                    self.webReturnList = res.extraData['TODAY_CANCEL_ORDER_LIST']
+                  }
+                }
+                // 网单id查询
+                else if(defaultUrl ==  self.webNewQueryApi){
+                  if(res.data){
+                     //退单判断
+                      res.data.forEach(ele=>{
+                        if(state){
+                          // 等待订单取消
+                          if(ele['STORE_ORDER.STATE'] == 'WAIT_CANCEL'){
+                            if(self.webReturnOrderId.indexOf(ele['STORE_ORDER.ORDER_ID'] != -1)){
+                              self.displayCanc = true
+                              self.webReturnList.unshift(ele)
+                            }
+                            for (var i = 0; i < self.webTodayList.length; i++) { 
+                              if (self.webTodayList[i]['STORE_ORDER.ORDER_ID'] === ele['STORE_ORDER.ORDER_ID']) {
+                               self.webTodayList.splice(i, 1);
+                               self.webTodayList.unshift(ele);
+                               break;
+                             }
+                           }
+                          }
+                        }
+                      })
+                    self.webNewList = res.data
+                    console.log(self.webNewList)
+                  }
+                }
+              }) 
+            },
             // 排序函数
             sortNum(a,b){
               return b - a 
             },
-            
+            // 订单状态改变
+            changeState(list,arr,state){
+              list.forEach(e=>{
+                if(arr.indexOf(e['STORE_ORDER.ORDER_ID']) != -1){
+                  e['STORE_ORDER.STATE'] = state
+                }
+              })
+            },
             //
             cleanFailedOrder(index){
               this.errorSubmitList.splice(index,1)
@@ -625,7 +701,7 @@ import change from './components/change/change.vue'
                   if(self.configList[index].name){
                     this.index = index;
                     this.move(index);
-                    if(self.configList[index].isrefresh || !self.configList[index].isRender) {
+                    if((self.configList[index].isrefresh || !self.configList[index].isRender)&& index == 4) {
                       this.render = true
                       this.$refs[self.configList[index].name].renderData(res => {
                         self.render = false
@@ -635,8 +711,9 @@ import change from './components/change/change.vue'
                     if(index == 4){
                       // console.log(this.webTodayList)
                       if(this.webTodayList){
-                        this.$refs[self.configList[index].name].getOrder(0)
+                        this.$refs[self.configList[index].name].getOrder(self.webTodayList,0)
                         this.$refs[self.configList[index].name].webALLQuery()
+                        // this.webTodayQuery()
                       }
                     }
                   }else{
@@ -662,7 +739,6 @@ import change from './components/change/change.vue'
               },
               renderOver (res){
                 this.render = res
-                console.log( this.render)
               },
               loadingOver (res){
                 this.loading = res
@@ -694,7 +770,6 @@ import change from './components/change/change.vue'
                 })
                 storage.getItem('add_order',res =>{
                   if(res.result == 'success' && res.data != 'false'){
-                    console.log(res)
                     self.waitSubmitList.push(JSON.parse(res.data))
                     storage.setItem('add_order','false',res=>{})
                   }
@@ -716,7 +791,6 @@ import change from './components/change/change.vue'
                 var self = this            
                 function fetch(list){
                   storage.setItem(self.storeId+'order_list',JSON.stringify(list),r=>{
-                    console.log(JSON.stringify(list))
                     if(list.length == 0){
                       return
                     }else{                    
@@ -742,7 +816,44 @@ import change from './components/change/change.vue'
                   })                
                 }
                 fetch(this.waitSubmitList)
-              }
+              },
+              // 打印
+              goprint(order){
+                var self = this
+                // storage.getItem('store_info',res =>{
+                    let source ='';
+                    if(order['STORE_ORDER.ORDER_SOURCE'] == 'ELEME'){
+                        source = '饿了么'
+                    }else if(order['STORE_ORDER.ORDER_SOURCE'] == 'MEITUAN'){
+                        source = '美团'
+                    }
+                    let obj = {
+                        'TYPE':'WEB',
+                        'STORE_ORDER.ORDER_SOURCE'       : source,
+                        'STORE_ORDER.GET_NUM'            : order['STORE_ORDER.GET_NUM'],
+                        'STORE_ORDER.STORE_NAME'         : order['STORE_ORDER.STORE_NAME'],
+                        'STORE_ORDER.STORE_PHONE'        : self.storeTel,
+                        // 送达时间
+                        'STORE_ORDER.DELIVERY_DATETIME'  : order['STORE_ORDER.DELIVERY_DATETIME'],
+                        'STORE_ORDER.ADD_DATETIME'       : order['STORE_ORDER.ADD_DATETIME'],
+                        'STORE_ORDER.ORDER_CODE'         : order['STORE_ORDER.ORDER_CODE'],
+                        'STORE_ORDER.REMARK'             : order['STORE_ORDER.REMARK'],
+                        'STORE_ORDER.STORE_ORDER_DETAILS': typeof order['STORE_ORDER.STORE_ORDER_DETAILS'] == 'object' ?order['STORE_ORDER.STORE_ORDER_DETAILS'] : JSON.parse(order['STORE_ORDER.STORE_ORDER_DETAILS']),
+                        'STORE_ORDER.SUM_MONEY'          : order['STORE_ORDER.SUM_MONEY'],
+                        'STORE_ORDER.DISCOUNT_MONEY'     : order['STORE_ORDER.DISCOUNT_MONEY'],
+                        'STORE_ORDER.DISTRIBUTION_MONEY' : order['STORE_ORDER.DISTRIBUTION_MONEY'],
+                        // 餐盒费
+                        'STORE_ORDER.BOX_MONEY'          : order['STORE_ORDER.BOX_MONEY'],
+                        'STORE_ORDER.PAID_MONEY'         : order['STORE_ORDER.PAID_MONEY'],
+                        'STORE_ORDER.UID'                : order['STORE_ORDER.UID'],
+                        'STORE_ORDER.ORDER_SOURCE_ADDR'  : order['STORE_ORDER.ORDER_SOURCE_ADDR'],
+                        'STORE_ORDER.USER_NAME'          : order['STORE_ORDER.USER_NAME'], 
+                        'STORE_ORDER.MEMB_PHONE'         : order['STORE_ORDER.MEMB_PHONE'], 
+                    }
+                    if(typeof(getEvent.printFrontTakeOutInfo) == "function"){
+                        getEvent.printFrontTakeOutInfo(obj,function(res){})
+                    }
+            },
 
             }
           }
