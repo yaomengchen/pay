@@ -1,24 +1,30 @@
 <template>
-    <div class="item" v-if="show" @click="close">
+    <div class="item" v-if="show" @click="stopClick">
         <div class="preferential-modal" @click="stopClick">
             <div class="title">
                 <div class="toggle-bar">
                     <div class="toggle-bar-item">
-                        <text class="toggle-bar-item-name">拒绝</text>
+                        <text class="toggle-bar-item-name" lines="3">验收开发中的功能请输入调试码，测试已经完成的功能不用输入任何内容直接点击确定</text>
                     </div>
                 </div>
                 
             </div> 
-            <div class="close-btn" @click="close">
+            <div class="close-btn">
                 <image class="close-btn-img" :src="imageObj.closeBtn"></image>
             </div>                
             <div class="swipe-container">
                 <div class="type-in-area type-in-area-2">
-                    <textarea class="textarea" placeholder="*请填写原因" autofocus="true" v-model="remark"></textarea>
+                    <textarea class="textarea" placeholder="输入调试码" autofocus="true" v-model="remark"></textarea>
                 </div>
-                <div class="confirm" @click="submit">
-                    <text class="confirm-text">确认</text>
-                </div>  
+                <div style="flex-direction:row;justify-content:space-between;width:300;height:60;">
+                    <div class="confirm" @click="submit">
+                        <text class="confirm-text">确认</text>
+                    </div>  
+                    <div class="confirm" @click="cancel">
+                        <text class="confirm-text">取消</text>
+                    </div> 
+                </div>
+                
             </div>                                                           
         </div>
     </div>
@@ -54,6 +60,7 @@
         flex-direction: row;
     }
     .toggle-bar-item {
+        width:750*$rate;
         padding-left: 14.5*$rate;
         padding-right: 14.5*$rate;
         justify-content: center;
@@ -67,6 +74,7 @@
         border-bottom-color:#f04e52;
     }
     .toggle-bar-item-name {
+        lines: 3;
         font-size:round(36*$rate);
         color: #333333;
     }
@@ -107,7 +115,7 @@
         color:#333333;
     }
     .confirm {
-        width: 790*$rate;
+        width: 320*$rate;
         height: 90*$rate;
         margin-bottom: 30*$rate;
         background-image: linear-gradient(to bottom right,#EF494D,#F98085);
@@ -162,9 +170,9 @@
     }
 </style>
 <script>
-    import icons from '../../assets/icon.js'
-    import filters from '../../common/filters.js'
-    import modal from '../../common/modal.js'
+    import icons from '../assets/icon.js'
+    import filters from '../common/filters.js'
+    import modal from '../common/modal.js'
     const storage = weex.requireModule('storage')
     export default {
         data () {
@@ -182,17 +190,14 @@
         methods: {
             submit(){
             	if(this.remark == undefined || this.remark == ''){
-            		modal.alert({message:'请填写拒绝原因'})
+                    this.$emit('submit',true,this.remark)
             	}else{
-            		let remark = this.remark.replace(/\uD83C[\uDF00-\uDFFF]|\uD83D[\uDC00-\uDE4F]/g, "");
-                	this.$emit('reject',false,remark)
+                    this.$emit('submit',true,this.remark)
+                    console.log(this.remark)
             	}
-                
-               
             },
-            close(){
-                var self = this
-                self.$emit('reject',false)
+            cancel(){
+                this.$emit('close',false)
             },
             getRemark(){
                 var self = this

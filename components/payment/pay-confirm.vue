@@ -8,11 +8,12 @@
             </div>           
             <input class="font-12 fs-33 input" type="number" placeholder="支付码" v-model="code" return-key-type="defalut" @return="submit"/>
             <div class="pay-foot">
-                <div class="btn bor-r" @click="cancel">
-                    <text class="font-12 fs-33">取消</text>
-                </div>
+                
                 <div class="btn" @click="submit">
                     <text class="font-12 fs-red">确认</text>
+                </div>
+                <div class="btn bor-r" @click="cancel">
+                    <text class="font-12 fs-33">取消</text>
                 </div>
             </div>
             

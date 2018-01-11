@@ -487,6 +487,7 @@
                         let name = val['STORE.STORE_NAME']
                         let service = val['STORE.SERVICE_ID']
                         let obj = {
+                            'TYPE':'ORDER',
                             'IS_OVER': 'true',
                             'STORE_ORDER.MEMB_CARD_MONEY': self.memberPay,
                             'STORE_ORDER.OTHER_PAY_WAY_TYPE':'CASH_PAY',

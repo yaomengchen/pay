@@ -11,6 +11,7 @@
                     <div class="item-bar"></div>
                     <div class="list">
                         <div class="list-item" v-for="(order,orderIndex) in orderList" :class="[(orderIndex==orderList.length-1)?'list-item-last':'']" @click="toggleActiveItem(orderIndex)">
+                            <!-- <div class="list-item" :class="[(orderIndex==orderList.length-1)?'list-item-last':'']" :v-if="order['STORE_ORDER.ORDER_SOURCE'] == 'DONE' || order['STORE_ORDER.ORDER_SOURCE'] == 'WAIT'"> -->
                             <div class="dot-sign-container">
                                 <image class="dot-sign" :src="order['STORE_ORDER.ORDER_SOURCE'] == 'MEITUAN'?meituanIcon:elmIcon"></image>
                             </div>
@@ -32,10 +33,9 @@
                                     <image class="return-sign-img" :src="returnIcon"></image>
                                 </div>
                             </div>
+                        <!-- </div> -->
                         </div>
-                        
                     </div>
-                    
                 </div>
             </scroller>
         <div class="billings-area" v-if="type == 'today'">
@@ -173,6 +173,7 @@
     .item-price {
         width: 201*$rate;
         height: 97*$rate;
+        padding-right: 47*$rate;
         justify-content: center;
         align-items: flex-end;
     }

@@ -167,7 +167,6 @@
               }else{
                 this.displayPri = false
               }  
-
               if(list){
                 this.printlist = list;
                 this.$refs.detail.goprint();
@@ -197,11 +196,18 @@
                     'url':api + '&STORE_ORDER.STORE_ID=' + self.storeid
                 },res=>{
                     if(self.pageNumber == 1){
-                        self.orderList = res.data
+                        self.orderList = []
+                        // 增   
+                        res.data.forEach(e=>{
+                            if(e['STORE_ORDER.ORDER_SOURCE'] == 'STORE'){
+                                self.orderList.push(e)
+                            }
+                        })
                         self.order = self.getOrder(this.focusOrder)
+                        // 增 
                     }else{
                         self.orderList = self.orderList.concat(res.data)
-                    }                                        
+                    }   
                     self.render ? '' : (self.render = true)
                     callback();
                 })

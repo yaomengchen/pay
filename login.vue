@@ -19,15 +19,18 @@
             </div>
             
         </div>
+        <codeInput :show="codeshow" @close="closeInput" @submit="selTest"></codeInput>
     </div>
 </template>
 <script>
 import modal from './common/modal.js'
-import stream from './common/stream.js'
+import codeInput from './components/code-input.vue'
 const animation = weex.requireModule('animation')
 const storage = weex.requireModule('storage')
+const stream = weex.requireModule('stream')
+const navigator = weex.requireModule('navigator')
 const notiEvent = weex.requireModule('notiEvent')
-import navigator from './common/navigator.js'
+// import navigator from './common/navigator.js'
 
 export default {
     data () {
@@ -41,16 +44,18 @@ export default {
             aftertype:'',
             channelId:'',
             type     :'',
-            testApi:'http://118.190.74.62:12019/jiaorder/bubu',
+            codeshow :'',
+            testApi:'http://bubu.jjtt.cc/jiaorder/bubu',
             workApi:'http://aa.eerrpp.cc/boloogo/bubu',
             apiHost: 'http://aa.eerrpp.cc/boloogo/bubu',
             usernameIcon:'http://jiaorder-img.oss-cn-shanghai.aliyuncs.com/weexApp/MS-username.png',
             passwordIcon:'http://jiaorder-img.oss-cn-shanghai.aliyuncs.com/weexApp/MS-password.png',
-            logo:'http://jiaorder-img.oss-cn-shanghai.aliyuncs.com/paySystemApp/icon/redLoginlogo.jpg'
+            logo:'http://jiaorder-img.oss-cn-shanghai.aliyuncs.com/paySystemApp/icon/redLoginlogo.jpg',
+            srcHost:'http://jiaorder-nome.oss-cn-shanghai.aliyuncs.com/pay/1001',
         }
     },
     components: {
-
+        codeInput,
     },
     created(){
         let self = this
@@ -61,6 +66,11 @@ export default {
               self.type = 'IOS_1006'
             })
         }
+        if(typeof window === 'object'){
+            console.log(1)
+            // pc端页面展示
+            self.srcHost = 'http://192.168.31.137:8080/web'
+        }
         storage.getItem('login_info',res=>{
             if(res.result == 'success'){
                 self.userId = JSON.parse(res.data).userId
@@ -70,18 +80,17 @@ export default {
                         self.apiHost = self.workApi
                         self.isTest = false;
                         self.debugTips = '';
-                        self.srcHost = 'http://boloogo-sys.oss-cn-shanghai.aliyuncs.com/app/work/storePay'
-                    }else{
+                        self.srcHost = 'http://jiaorder-nome.oss-cn-shanghai.aliyuncs.com/pay/1001'
+                    }else if(debug.result === 'success'){
                         self.apiHost = self.testApi
                         self.isTest = true
-                        self.srcHost = 'http://jiaorder-nome.oss-cn-shanghai.aliyuncs.com/pay/1000'
+                        self.srcHost = 'http://jiaorder-nome.oss-cn-shanghai.aliyuncs.com/pay/1001'
                         self.debugTips = (JSON.parse(debug.data).type === 'DEBUG'?('DEBUG模式'+JSON.parse(debug.data).code) :'开发模式')
                     }
                     if(typeof window === 'object'){
                             // pc端页面展示
                             self.srcHost = 'http://192.168.31.137:8080/web'
                         }
-                        
                         storage.setItem('pay_system_type',JSON.stringify({"API":self.apiHost,"SRC":self.srcHost}), 
                             function(type){
 
@@ -119,23 +128,26 @@ export default {
                 self.islogin = true
                 stream.fetch({
                     method: 'GET',
-                    url:'/bee/user/user/loginByApp?APP_TOKEN=9C4F2C2F67E34BB29BF296DBDBF26922&USER.LOGIN_ID='+ self.userId + '&USER.LOGIN_PASSWORD='+ self.password+"&DEVICE_NO="+self.channelId+"&DEVICE_TYPE="+self.type,
+                    url:self.apiHost+'/bee/user/user/loginByApp?APP_TOKEN=9C4F2C2F67E34BB29BF296DBDBF26922&USER.LOGIN_ID='+ self.userId + '&USER.LOGIN_PASSWORD='+ self.password+"&DEVICE_NO="+self.channelId+"&DEVICE_TYPE="+self.type,
                     type: 'json'
                 },res => {
-                    if(res.code === 0){
-                        var bubuid = res.extraData.bubuId
+                    if(res.data.code === 0){
+                        var bubuid = res.data.extraData.bubuId
                         storage.setItem('pay_bubuid',bubuid,()=>{})
                         stream.fetch({
-                            headers:{token:bubuid},
+                            headers:{
+                                'token':bubuid,
+                                'Accept-Encoding':'gzip'
+                            },
                             method: 'GET',
-                            url: '/store/queryBySession',
+                            url: self.apiHost+'/store/queryBySession',
                             type: 'json',
                         }, res2=>{
-                            if(res2.code === 0){
+                            if(res2.data.code === 0){
                                 self.islogin = false
-                                storage.setItem('store_info',JSON.stringify(res2.data[0]))
+                                storage.setItem('store_info',JSON.stringify(res2.data.data[0]))
                                 storage.setItem('pay_bubuid',bubuid,()=>{
-                                    storage.setItem('userInfo',JSON.stringify(res.extraData.USER_LIST[0]),function(){
+                                    storage.setItem('userInfo',JSON.stringify(res.data.extraData.USER_LIST[0]),function(){
                                         modal.toast({message:'登录成功',duration:1})
                                         storage.setItem('login_info',JSON.stringify({
                                             userId:self.userId,
@@ -144,12 +156,26 @@ export default {
                                             storage.getItem('pay_debug_info',debug=>{
                                                 if(debug.result === 'success' && JSON.parse(debug.data).type != 'DEBUG' && JSON.parse(debug.data).type != 'TEST'){
                                                     self.apiHost = self.workApi
-                                                }else{
+                                                }else if(debug.result === 'success'){
                                                     self.apiHost = self.testApi
+                                                }else{
+                                                    storage.setItem('pay_debug_info',JSON.stringify({type:'NORMAL',code:''}), function(e){
+                                                        self.apiHost = self.workApi
+                                                        self.passNum = 0;
+                                                        self.isTest = false;
+                                                        if(typeof window === 'object'){
+                                                            // pc端页面展示
+                                                            self.srcHost = 'http://192.168.31.137:8080/web'
+                                                        }else{
+                                                            self.srcHost = 'http://boloogo-sys.oss-cn-shanghai.aliyuncs.com/pay/1001'
+                                                        }
+                                                        storage.setItem('pay_system_type',JSON.stringify({"API":self.apiHost,"SRC":self.srcHost}), 
+                                                            function(type){})
+                                                    })
                                                 }
                                                 self.islogin = false
                                                 navigator.push({
-                                                    'url': "/main",
+                                                    'url': self.srcHost+"/main.js",
                                                     'animated': "false"
                                                 }, function(e){})
                                             })
@@ -159,9 +185,10 @@ export default {
                             }
                         })
                     }else{
-                        modal.alert({message:res.msg})
-                        self.islogin = false
+                        modal.alert({message:res.data.msg})
                     }
+                },function(){
+                    self.islogin = false
                 }
                 )
             }
@@ -186,34 +213,34 @@ export default {
             在登录页面的右上角点击五次之后 开启切换到测试环境 如果输入了调试码 则进入debug模式 如果没有输入调试码 则进入到开发环境
             如果已经是处在测试环境 或者 debug模式 则点击可以切换为正常模式
             */
-            selTest(){
+            selTest(res,mark){
                 var self = this
                 self.passNum += 1;
-                if(self.passNum === 5){
+                if(self.passNum >= 5){
                     var code = ''
-                    modal.prompt({
-                      'message': '验收开发中的功能请输入调试码，测试已经完成的功能不用输入任何内容直接点击确定',
-                      'okTitle' : '确定',
-                      'cancelTitle' : '取消'
-                  }, function (e) {
-                      if (e.result === '确定') {
-                        var code = e.data
-                        console.log(e)
-                        // storage.setItem('pay_debug_info',code.indexOf('udbu') != '-1' ?(JSON.stringify({type:'DEBUG',code:code})):(JSON.stringify({type:'TEST',code:''})), function(e){
-                        storage.setItem('pay_debug_info',(JSON.stringify({type:'DEBUG',code:'1901udbu2350'})), function(e){
-
+                    self.codeshow = true;
+                    if(res == true){
+                        var code = mark
+                        storage.setItem('pay_debug_info',code.indexOf('udbu') != '-1' ?(JSON.stringify({type:'DEBUG',code:code})):(JSON.stringify({type:'TEST',code:''})), function(e){
+                        // storage.setItem('pay_debug_info',(JSON.stringify({type:'DEBUG',code:'1901udbu2350'})), function(e){
+                            self.codeshow = false;
                             self.apiHost = self.testApi
                             self.isTest = true;
-                            // self.debugTips = (code.indexOf('udbu') != '-1'?('DEBUG模式'+code) :'开发模式');  
-                            self.debugTips = ('DEBUG模式'+'1901udbu2350');  
-                            self.srcHost   = 'http://jiaorder-nome.oss-cn-shanghai.aliyuncs.com/pay/1000';
-
+                            self.passNum = 0;
+                            self.debugTips = (code.indexOf('udbu') != '-1'?('DEBUG模式'+code) :'开发模式');  
+                            // self.debugTips = ('DEBUG模式'+'1901udbu2350');  
+                            if(typeof window === 'object'){
+                                self.srcHost = 'http://192.168.31.137:8080/web'
+                            }else{
+                                self.srcHost   = 'http://jiaorder-nome.oss-cn-shanghai.aliyuncs.com/pay/1001';
+                            }
                             storage.setItem('pay_system_type',JSON.stringify({"API":self.apiHost,"SRC":self.srcHost}), 
                                 function(type){})
                         })
                     }
-                });
+
                 }else if(self.isTest === true){
+                    self.codeshow = false;
                     modal.confirm({
                         'message': '切换到正常模式？',
                         'okTitle' : '确认',
@@ -222,9 +249,9 @@ export default {
                         if (e= '确认') {
                             storage.setItem('pay_debug_info',JSON.stringify({type:'NORMAL',code:''}), function(e){
                                 self.apiHost = self.workApi
-                                self.isTest = false;
                                 self.passNum = 0;
-                                self.srcHost = 'http://boloogo-sys.oss-cn-shanghai.aliyuncs.com/app/work/storePay'
+                                self.isTest = false;
+                                self.srcHost = 'http://boloogo-sys.oss-cn-shanghai.aliyuncs.com/pay/1001'
                                 storage.setItem('pay_system_type',JSON.stringify({"API":self.apiHost,"SRC":self.srcHost}), 
                                     function(type){})
                             })
@@ -232,6 +259,9 @@ export default {
                     });
                 }  
             // 新增
+        },
+        closeInput(){
+            this.codeshow = false;
         },
 
     }

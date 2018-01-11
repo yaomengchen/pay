@@ -17,14 +17,20 @@
         </div>
         <!-- 网单 -->
         <div class="pageItem">
-          <weborder ref="weborder"  @renderOrder="renderOver"  :todaylist="webAllTodayList" :returnlist="webAllReturnList" :serviceid="serviceId" :storeid="storeId" :num="cancelNum"></weborder> 
+          <weborder ref="weborder"  @renderOrder="renderOver"  :todaylist="webAllTodayList" :returnlist="webAllReturnList" :num="cancelNum" @todayFn="webTodayQuery"></weborder> 
         </div>
         <!-- 网单 -->
+        <!-- 账号 -->
+        <div class="pageItem">
+          <info ref="info"  @renderOrder="renderOver"  :todaylist="webAllTodayList" :returnlist="webAllReturnList" :num="cancelNum" @todayFn="webTodayQuery"></info> 
+        </div>
+        <!-- 账号 -->
       </div>
       <div class="sidebar bg">
         <div>
-          <div class="item" @click="goLogin('1')">
-            <image :src="privateIcon" class="private-icon"></image>                  
+          <div class="item" @click="switchPage(5)">
+            <image :src="privateIcon" class="private-icon"></image> 
+            <text class="item-name">账号</text>                  
           </div>
           <div class="item" @click="switchPage(0)">
             <image :src="index == 0 ? cartIconAction : cartIcon" class="cart-icon"></image>
@@ -58,7 +64,7 @@
       </div>        
     </div>
     <memberConfirm @data="memberData" @render="renderOver" ref="confirm"></memberConfirm> 
-    <!-- <renderTip :render="render"></renderTip> -->
+    <renderTip :render="render"></renderTip>
     <dataLoading :loading="loading"></dataLoading>
     <bigInput @event="inputEvent" ref="input"></bigInput>
     <cancelTip @cancel="cancelOrder" :show="displayCanc" @click="switchPage(4)"></cancelTip>
@@ -165,13 +171,16 @@ $rate:0.3662;
 }
 </style>
 <script>
-import product from './components/product/product.vue'
-import order from './components/order/order.vue'
-import member from './components/member/member.vue'
-import change from './components/change/change.vue'
+    import product from './components/product/product.vue'
+    import order from './components/order/order.vue'
+    import member from './components/member/member.vue'
+    import change from './components/change/change.vue'
     //网单
     import weborder from './components/weborder/weborder.vue'
     //网单
+    // 账号
+    import info from './components/info/info.vue'
+    // 账号
     import renderTip from './components/render-tip.vue'
     import dataLoading from './components/loading.vue'
     import bigInput from './components/big-input.vue'
@@ -214,6 +223,8 @@ import change from './components/change/change.vue'
                 webReturnApi      :'/bee/three/waimai/queryAllTodayCancelOrderByStore?SERVICE_ID=',
                 // 详情查询
                 webNewQueryApi    :'/bee/store/order/bill/getById?STORE_ORDER.ORDER_ID=',
+                // 打印状态
+                printStateApi     :'/bee/three/waimai/updatePrintState',
                 
                 online: false,
                 index: 0,
@@ -238,18 +249,24 @@ import change from './components/change/change.vue'
                   //网单
                   {
                     name:'weborder',isrefresh:true,isRender:false                  
-                  }
+                  },
                   //网单
+                  // 账号
+                  {
+                    name:'info',isrefresh:true,isRender:false                  
+                  }
+                  // 账号
                   ],
+
                   // 推送订单状态
                   waimaiState:{
                     'WAIMAI_ELEME.CANCEL'     :'CANCEL',
                     'WAIMAI_ELEME.DONE'       :'DONE',
-                    'WAIMAI_ELEME.WAIT_CANCEL':'WAIT_CANCEL',
+                    'WAIMAI_ELEME.APPLY_REFUND':'WAIT_CANCEL',
                     'WAIMAI_ELEME.NEW_ORDER '      :'WAIT ',
                     'WAIMAI_MEITUAN.CANCEL'      :'CANCEL',
                     'WAIMAI_MEITUAN.DONE'        :'DONE',
-                    'WAIMAI_MEITUAN.WAIT_CANCEL' :'WAIT_CANCEL',
+                    'WAIMAI_MEITUAN.APPLY_REFUND' :'WAIT_CANCEL',
                     'WAIMAI_MEITUAN.NEW_ORDER'   :'WAIT'
                   },
                   waitSubmitList:[],
@@ -268,18 +285,18 @@ import change from './components/change/change.vue'
                   webReturnList:[],
                   webAllOrderId:[],
                   webTodayReturnList:[],
-                  cancelNum:"",
+                  cancelNum:0,
                   allPageNum:'',
                   goQuery:true,
                   webReturnOrderId:[],
+                  webAllTodayList:[],
                   storeTel:'',  
+                  i:0,
                 }
               },
               created(){
                 var self = this
-                self.webTodayQuery()
-                self.webReturnQuery()
-                self.webIdQuery();
+                
                 self.webToday = format.format().substr(0,10)
                 if(typeof(instanceEvent.setInstanceMap) == 'function'){
                   instanceEvent.setInstanceMap("MAIN_INSTANCE");
@@ -302,10 +319,13 @@ import change from './components/change/change.vue'
             this.render = true;
             storage.getItem('store_info',res=>{
               let val = JSON.parse(res.data)
-            self.storeId   = val['STORE.STORE_ID']
-            self.storeTel  = val['STORE.CONTACT_PHONE']
-            self.storeName = val['STORE.STORE_NAME']
-            self.serviceId = val['STORE.SERVICE_ID']
+              self.storeId   = val['STORE.STORE_ID']
+              self.storeTel  = val['STORE.CONTACT_PHONE']
+              self.storeName = val['STORE.STORE_NAME']
+              self.serviceId = val['STORE.SERVICE_ID']
+              self.webTodayQuery()
+              self.webReturnQuery()
+              self.webIdQuery();
             /*
     
                 获取登录用户所属门店的收银方式
@@ -349,25 +369,27 @@ import change from './components/change/change.vue'
             count(){
               return this.waitSubmitList.length + this.errorSubmitList.length
             },
-            webAllTodayList(){
-            // return this.webTodayList
-            if(this.webNewList){
-              this.webNewList.forEach(e=>{
-                if(this.webAllOrderId.indexOf(e['STORE_ORDER.ORDER_ID']) == -1){
-                  this.webTodayList.unshift(e)
-                  this.goprint(e)
-                  this.webAllOrderId.unshift(e['STORE_ORDER.ORDER_ID']) 
-                  this.webTodayList['SUM'] += parseFloat(e['STORE_ORDER.SUM_MONEY'])
-                }
-              })
-              
-               this.webTodayList['TYPE'] = this.webTodayList.length
-              return this.webTodayList
-            }else{
-              return this.webTodayList
-            }
+          //   webAllTodayList(){
+          //   let self = this;
+          //   // return this.webTodayList
+          //   if(this.webNewList){
+          //     this.webNewList.forEach(e=>{
+          //       if(this.webAllOrderId.indexOf(e['STORE_ORDER.ORDER_ID']) == -1 && e['STORE_ORDER.STATE'] != 'DONE'){
+          //         this.webTodayList.unshift(e)
+          //         this.webAllOrderId.unshift(e['STORE_ORDER.ORDER_ID']) 
+          //         this.webTodayList['SUM'] += parseFloat(e['STORE_ORDER.SUM_MONEY'])
+          //         this.goprint(e)
+          //       }
+          //     })
+          //     // this.$refs.weborder.getOrder(self.webTodayList,0)
+          //     self.webAllOrderId.sort(self.sortNum)
+          //     this.webTodayList['TYPE'] = this.webTodayList.length
+          //     return this.webTodayList
+          //   }else{
+          //     return this.webTodayList
+          //   }
 
-          },
+          // },
           webAllReturnList(){
             let self = this;
             if(self.webNewList){
@@ -376,7 +398,6 @@ import change from './components/change/change.vue'
                   this.webReturnList.push(ele)
                 }
               })
-
               return this.webReturnList
             }
           },
@@ -384,18 +405,16 @@ import change from './components/change/change.vue'
           	let self = this;
             let num  = 0  
                 
-            if(self.webReturnList){
-              for (var i = 0; i < self.webReturnList.length; i++) {
-                if (self.webReturnList[i]['STORE_ORDER.STATE'] === 'WAIT_CANCEL') {
-                  self.webTodayList.splice(i, 1);
-                  return true;
-                  break
-                }else{
+            if(self.webTodayList){
+              for (var i = 0; i < self.webTodayList.length; i++) {
+                if (self.webTodayList[i]['STORE_ORDER.STATE'] === 'WAIT_CANCEL') {
+                  // self.webTodayList.splice(i, 1);
                   num++
+                  return true;
                 }
-                if(num == self.webReturnList.length){
-                  return false;
-                }
+                // if(num == self.webReturnList.length){
+                //   return false;
+                // }
               }
             }
           },
@@ -415,15 +434,6 @@ import change from './components/change/change.vue'
               }
 
             },
-            // webTodayList(){
-            //   let id = this.webBigId
-            //   if(this.webTodayList){
-            //     if(this.webOrderId[0] != id){
-            //        this.webBigId = this.webOrderId[0]
-            //     }
-            //     // this.webIdQuery()
-            //   }
-            // },
           /*
             此观察者检测的是  改变pending(开关)观察者的状态 判断订单数组是否为空 当数组为空的时候  就把开关关闭  数组不为空的时候把开关打开
             */
@@ -445,6 +455,7 @@ import change from './components/change/change.vue'
             product,
             order,
             weborder,
+            info,
             member,
             renderTip,
             bigInput,
@@ -463,15 +474,13 @@ import change from './components/change/change.vue'
               type = e['key']['CURRENT_TYPE']
               if(self.webAllOrderId.indexOf(arr) == -1 && self.waimaiState[type] == 'WAIT'){
                 self.webNewQuery(e)
-                // self.webTodayList.unshift(e)
-                // self.goprint(e)
-                // self.webAllOrderId.unshift(e['STORE_ORDER.ORDER_ID']) 
-                // self.webTodayList['SUM'] += parseFloat(e['STORE_ORDER.SUM_MONEY'])
+
               }else if(self.webAllOrderId.indexOf(arr) != -1 && self.waimaiState[type] == 'WAIT_CANCEL'){
                 for (var i = 0; i < self.webTodayList.length; i++) { 
                   if (self.webTodayList[i]['STORE_ORDER.ORDER_ID'] === ele['STORE_ORDER.ORDER_ID']) {
                     self.webTodayList.splice(i, 1);
                     self.webTodayList.unshift(ele);
+                    self.$refs.weborder.getOrder(self.webTodayList,0)
                     break;
                   }
                 }
@@ -479,6 +488,7 @@ import change from './components/change/change.vue'
                 for (var i = 0; i < self.webTodayList.length; i++) { 
                   if (self.webTodayList[i]['STORE_ORDER.ORDER_ID'] === ele['STORE_ORDER.ORDER_ID']) {
                     self.webTodayList['STORE_ORDER.STATE'] = self.waimaiState[type];
+                    self.$refs.weborder.getOrder(self.webTodayList,0)
                     break;
                   }
                 }
@@ -494,7 +504,6 @@ import change from './components/change/change.vue'
               done    = [],
               arrlist = [],
               canclist= [];
-              self.webBigId = 1954
               stream.fetch({
                 method: 'GET',
                 url: self.webQueryApi + self.serviceId + '&STORE_ID=' + self.storeId +'&LAST_ORDER_ID=' + self.webBigId,
@@ -542,6 +551,7 @@ import change from './components/change/change.vue'
                 if(res.extraData['CANCEL']){
                   cancel = res.extraData['CANCEL'];
                   self.changeState(self.webReturnList,cancel,'CANCEL')
+                  self.changeState(self.webTodayList,cancel,'CANCEL')
                 };
 
               // 轮询取消订单状态
@@ -574,11 +584,34 @@ import change from './components/change/change.vue'
               let self = this;
               self.getData(self.webTodayApi + self.serviceId + '&STORE_ID=' + self.storeId,self.webTodayApi)
             },
-            // 今日网单查询
+            // 今日网单查询c
             // 今日退单查询
             webReturnQuery(){
               let self = this;
               self.getData(self.webReturnApi + self.serviceId + '&STORE_ID=' + self.storeId,self.webReturnApi)
+            },
+            // 添加新订单
+            getwebAllTodayList(){
+            let self = this;
+            // modal.alert({message:12})
+            if(this.webNewList){
+              this.webNewList.forEach(e=>{
+                if(this.webAllOrderId.indexOf(e['STORE_ORDER.ORDER_ID']) == -1 && e['STORE_ORDER.STATE'] != 'DONE'){
+                  this.webAllOrderId.unshift(e['STORE_ORDER.ORDER_ID']) 
+                  this.webTodayList.unshift(e)
+                  this.webTodayList['SUM'] += parseFloat(e['STORE_ORDER.SUM_MONEY'])
+                  this.goprint(e)
+                }
+              })
+              self.webAllOrderId.sort(self.sortNum)
+              self.webBigId   = self.webAllOrderId[0];
+              this.webTodayList['TYPE'] = this.webTodayList.length
+              this.webAllTodayList = this.webTodayList
+            }else{
+              this.webAllTodayList = this.webTodayList
+
+            }
+
             },
             // 今日退单查询
             getData(url,defaultUrl,state){
@@ -606,6 +639,7 @@ import change from './components/change/change.vue'
                       self.webBigId   = 0;
                     }
                     self.webTodayList = res.extraData['TODAY_ORDER_LIST'];
+                    self.$refs.weborder.getOrder(self.webTodayList,0)
                     self.webTodayList['SUM'] = sum
                   }
                 }
@@ -613,7 +647,9 @@ import change from './components/change/change.vue'
                 else if(defaultUrl ==  self.webReturnApi){
                   if(res.extraData['TODAY_CANCEL_ORDER_LIST']){
                     res.extraData['TODAY_CANCEL_ORDER_LIST'].forEach(ele=>{
-                      num ++
+                      if(ele['STORE_ORDER.STATE'] == 'WAIT_CANCEL'){
+                        num ++
+                      }
                       self.webReturnOrderId.push(ele['STORE_ORDER.ORDER_ID'])
                     })
                     self.cancelNum = num;
@@ -628,22 +664,26 @@ import change from './components/change/change.vue'
                         if(state){
                           // 等待订单取消
                           if(ele['STORE_ORDER.STATE'] == 'WAIT_CANCEL'){
-                            if(self.webReturnOrderId.indexOf(ele['STORE_ORDER.ORDER_ID'] != -1)){
-                              self.displayCanc = true
+                            if(self.webReturnOrderId.indexOf(ele['STORE_ORDER.ORDER_ID']) == -1){
                               self.webReturnList.unshift(ele)
+                              self.webReturnOrderId.push(ele['STORE_ORDER.ORDER_ID'])
                             }
                             for (var i = 0; i < self.webTodayList.length; i++) { 
-                              if (self.webTodayList[i]['STORE_ORDER.ORDER_ID'] === ele['STORE_ORDER.ORDER_ID']) {
-                               self.webTodayList.splice(i, 1);
-                               self.webTodayList.unshift(ele);
-                               break;
+                              if (self.webTodayList[i]['STORE_ORDER.ORDER_ID'] === ele['STORE_ORDER.ORDER_ID']){
+                                self.webAllOrderId.unshift(ele['STORE_ORDER.ORDER_ID'])
+                                self.webTodayList.splice(i, 1);
+                                self.webTodayList.unshift(ele);
+                                self.$refs.weborder.getOrder(self.webTodayList,0)
+                                self.displayCanc = true;
+                                break;
                              }
                            }
+
                           }
                         }
                       })
                     self.webNewList = res.data
-                    console.log(self.webNewList)
+                    self.getwebAllTodayList();
                   }
                 }
               }) 
@@ -701,7 +741,7 @@ import change from './components/change/change.vue'
                   if(self.configList[index].name){
                     this.index = index;
                     this.move(index);
-                    if((self.configList[index].isrefresh || !self.configList[index].isRender)&& index == 4) {
+                    if((self.configList[index].isrefresh || !self.configList[index].isRender) && index != 4 && index != 5) {
                       this.render = true
                       this.$refs[self.configList[index].name].renderData(res => {
                         self.render = false
@@ -709,17 +749,12 @@ import change from './components/change/change.vue'
                       })
                     }
                     if(index == 4){
-                      // console.log(this.webTodayList)
-                      if(this.webTodayList){
-                        this.$refs[self.configList[index].name].getOrder(self.webTodayList,0)
-                        this.$refs[self.configList[index].name].webALLQuery()
-                        // this.webTodayQuery()
-                      }
+                      this.render = false
+                      this.webTodayQuery();
+                      this.$refs[self.configList[index].name].getOrder(self.webTodayList,0);
                     }
                   }else{
-
                     modal.toast({message:'此功能暂时没有开放',duration:1})
-
                   }
                 }            
               },
@@ -733,9 +768,7 @@ import change from './components/change/change.vue'
                 timingFunction: 'ease',
                 needLayout:false,
                 delay: 0 //ms
-              }, function () {
-
-              })
+              }, function () {})
               },
               renderOver (res){
                 this.render = res
@@ -820,6 +853,8 @@ import change from './components/change/change.vue'
               // 打印
               goprint(order){
                 var self = this
+                self.i ++
+                console.log(self.i)
                 // storage.getItem('store_info',res =>{
                     let source ='';
                     if(order['STORE_ORDER.ORDER_SOURCE'] == 'ELEME'){
@@ -839,7 +874,7 @@ import change from './components/change/change.vue'
                         'STORE_ORDER.ORDER_CODE'         : order['STORE_ORDER.ORDER_CODE'],
                         'STORE_ORDER.REMARK'             : order['STORE_ORDER.REMARK'],
                         'STORE_ORDER.STORE_ORDER_DETAILS': typeof order['STORE_ORDER.STORE_ORDER_DETAILS'] == 'object' ?order['STORE_ORDER.STORE_ORDER_DETAILS'] : JSON.parse(order['STORE_ORDER.STORE_ORDER_DETAILS']),
-                        'STORE_ORDER.SUM_MONEY'          : order['STORE_ORDER.SUM_MONEY'],
+                        'STORE_ORDER.SUM_MONEY'          : (order['STORE_ORDER.SUM_PRD_MONEY'] - order['STORE_ORDER.BOX_MONEY']).toFixed(2),
                         'STORE_ORDER.DISCOUNT_MONEY'     : order['STORE_ORDER.DISCOUNT_MONEY'],
                         'STORE_ORDER.DISTRIBUTION_MONEY' : order['STORE_ORDER.DISTRIBUTION_MONEY'],
                         // 餐盒费
@@ -851,7 +886,13 @@ import change from './components/change/change.vue'
                         'STORE_ORDER.MEMB_PHONE'         : order['STORE_ORDER.MEMB_PHONE'], 
                     }
                     if(typeof(getEvent.printFrontTakeOutInfo) == "function"){
-                        getEvent.printFrontTakeOutInfo(obj,function(res){})
+                        getEvent.printFrontTakeOutInfo(obj,function(res){
+                          // modal.alert({message:res})
+                          stream.fetch({
+                            method:'GET',
+                            url:self.printStateApi+order['STORE_ORDER.STORE_ID'],
+                          },res =>{})
+                        })
                     }
             },
 

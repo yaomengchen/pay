@@ -15,23 +15,27 @@
                         </div>
                         <div class="table-sub-head">
                             <div class="table-sub-detail" v-if="order['STORE_ORDER.STATE'] == 'WAIT_CANCEL' || order['STORE_ORDER.STATE'] == 'CANCEL'">
-                                <image :src="returnIcon" class="isReturn"></image> 
+                                <image :src="markDrakIcon" class="detailIcon"></image> 
                                 <text class="table-sub-text-or "  lines="3" >退单原因:{{order['STORE_ORDER.CANCEL_REMARK']}}</text>
                             </div>
                             <div class="table-sub-detail">
-                                <image :src="returnIcon" class="isReturn"></image> 
+                                <image :src="markDrakIcon" class="detailIcon"></image> 
                                 <text class="table-sub-text"  lines="3">{{order['STORE_ORDER.USER_NAME'] || '匿名'}}  {{order['STORE_ORDER.MEMB_PHONE']}}</text>
                             </div>
                             <div class="table-sub-detail">
-                                <image :src="returnIcon" class="isReturn"></image> 
+                                <image :src="localIcon" class="detailIcon"></image> 
                                 <text class="table-sub-text"  lines="3">{{order['STORE_ORDER.ORDER_SOURCE_ADDR']}}</text>
                             </div>
                             <div class="table-sub-detail">
-                                <image :src="returnIcon" class="isReturn"></image> 
+                                <image :src="numberIcon" class="detailIcon"></image> 
                                 <text class="table-sub-text"  lines="3">平台单号:{{order['STORE_ORDER.ORDER_CODE']}}  (取单号:#{{order['STORE_ORDER.GET_NUM']}})</text>
                             </div>
                             <div class="table-sub-detail">
-                                <image :src="returnIcon" class="isReturn"></image> 
+                                <image :src="numberIcon" class="detailIcon"></image> 
+                                <text class="table-sub-text"  lines="3">门店来源:{{order['STORE_ORDER.STORE_NAME']}}</text>
+                            </div>
+                            <div class="table-sub-detail">
+                                <image :src="markDrakIcon" class="detailIcon"></image> 
                                 <text class="table-sub-text"  lines="3">备注:{{order['STORE_ORDER.REMARK']}}</text>
                             </div>
                         </div>
@@ -49,10 +53,8 @@
                         <div class="empty-top-border-style row-item" v-for="item in order['STORE_ORDER.STORE_ORDER_DETAILS']">
                             <div class="col-product">
                                 <text class="product-text">{{item['STORE_ORDER_DETAIL.PRD_NAME']}}</text>
-                                <text class="sku-text">{{item['STORE_ORDER_DETAIL.SKU_CONTENT']}}</text>
                                 <div class="flex-row">
                                     <text class="single-price-text">{{item['STORE_ORDER_DETAIL.PRD_PRICE'] | price}}</text>
-                                    <!-- <text class="single-price-oldtext" v-if="item['STORE_ORDER_DETAIL.PRD_PRICE'] - item['STORE_ORDER_DETAIL.PRD_FINAL_PRICE'] != 0">{{item['STORE_ORDER_DETAIL.PRD_PRICE'] | price}}</text> -->
                                 </div>                                
                             </div>
                             <div class="col-count">
@@ -93,7 +95,7 @@
                         <text class="computed-item-value-text">{{order['STORE_ORDER.SUM_PRD_MONEY']}}</text>
                     </div>
                     <div class="computed-item-value">
-                        <text class="computed-item-value-text  computed-item-value-red-text">-{{order['STORE_ORDER.DISCOUNT_MONEY']}}</text>
+                        <text class="computed-item-value-text  computed-item-value-red-text">{{order['STORE_ORDER.DISCOUNT_MONEY']}}</text>
                     </div>
                     <div class="computed-item-value">
                         <text class="computed-item-value-text">{{order['STORE_ORDER.DISTRIBUTION_MONEY']}}</text>
@@ -117,7 +119,6 @@
             </div>
         </div>
         <div class="confirm-group" v-if="order['STORE_ORDER.STATE'] == 'WAIT_CANCEL'">
-            
             <div class="confirm-group-item reject-all-btn" @click="agreeRefund"  v-if="order['STORE_ORDER.STATE'] == 'WAIT_CANCEL'&&type == 'today'">
                 <text class="confirm-group-item-text">同意取消</text>
             </div> 
@@ -203,7 +204,7 @@
         color: #333333;
     }
     .table-sub-text {
-        width:  883*$rate;
+        width: 833*$rate;
         lines: 3;
         text-overflow:ellipsis;
         font-size:round( 14/$rem*$rate);
@@ -437,6 +438,12 @@
         flex-direction: row;
         align-items: center;
     }
+    .detailIcon{
+        width:13px;
+        height:13px;
+        margin-right:4px;
+        margin-top:2px;
+    }
 </style>
 <script>
     import icon from '../../assets/icon.js'
@@ -450,7 +457,12 @@
         data () {
             return {
                 returnIcon: icon.orderIcon.return,
+                numberIcon: icon.weborderIcon.number,
+                telIcon: icon.weborderIcon.tel,
+                markDrakIcon: icon.weborderIcon.markDrak,
+                localIcon: icon.weborderIcon.local,
                 isRejectOrder: false,
+                storeTel:'',
                 discountType:{
                     'PRD_DISCOUNT':'单品优惠',
                     'DISCOUNT':'折扣优惠',
@@ -458,6 +470,14 @@
                 },
                 // cancelbtn:'取消订单',
             }
+        },
+         mounted(){
+            var self = this
+            storage.getItem('store_info',res=>{
+                let val = JSON.parse(res.data)
+                self.storeTel  = val['STORE.CONTACT_PHONE']
+            })
+
         },
         props:['order','printed','list','cancelbtn','type'],
         filters:{
@@ -469,30 +489,11 @@
             }
         },
         methods:{
-            // print(){
-            //     var self = this
-            //     self.$emit('printed',true);
-            // },
             cancel(){
-                // switch(this.cancelbtn)
-                // {
-                // case '取消订单':
-                //     this.cancelbtn = '取消中...'
-                //   break;
-                // case '取消中...':
-                //     this.cancelbtn = '已取消'
-                //   break;
-                // case '已取消':
-                //     this.cancelbtn = '已取消'
-                //   break;
-                // default:
-                //     this.cancelbtn = '取消订单'
-                // }
                 this.$emit('type',true,this.order['STORE_ORDER.ORDER_SOURCE'],this.order['STORE_ORDER.ORDER_ID'])
             },
             goprint(){
                 var self = this
-                // storage.getItem('store_info',res =>{
                     let source ='';
                     if(self.order['STORE_ORDER.ORDER_SOURCE'] == 'ELEME'){
                         source = '饿了么'
@@ -504,18 +505,18 @@
                         'STORE_ORDER.ORDER_SOURCE'       : source,
                         'STORE_ORDER.GET_NUM'            : self.order['STORE_ORDER.GET_NUM'],
                         'STORE_ORDER.STORE_NAME'         : self.order['STORE_ORDER.STORE_NAME'],
-                        'STORE_ORDER.STORE_PHONE'        : self.order['STORE_ORDER.MEMB_CARD_NUM'],
+                        'STORE_ORDER.STORE_PHONE'        : self.storeTel,
                         // 送达时间
                         'STORE_ORDER.DELIVERY_DATETIME'  : self.order['STORE_ORDER.DELIVERY_DATETIME'],
                         'STORE_ORDER.ADD_DATETIME'       : self.order['STORE_ORDER.ADD_DATETIME'],
                         'STORE_ORDER.ORDER_CODE'         : self.order['STORE_ORDER.ORDER_CODE'],
                         'STORE_ORDER.REMARK'             : self.order['STORE_ORDER.REMARK'],
                         'STORE_ORDER.STORE_ORDER_DETAILS': self.order['STORE_ORDER.STORE_ORDER_DETAILS'],
-                        'STORE_ORDER.SUM_MONEY'          : self.order['STORE_ORDER.SUM_MONEY'],
+                        'STORE_ORDER.SUM_MONEY'          : (self.order['STORE_ORDER.SUM_PRD_MONEY'] - self.order['STORE_ORDER.BOX_MONEY']).toFixed(2),
                         'STORE_ORDER.DISCOUNT_MONEY'     : self.order['STORE_ORDER.DISCOUNT_MONEY'],
                         'STORE_ORDER.DISTRIBUTION_MONEY' : self.order['STORE_ORDER.DISTRIBUTION_MONEY'],
                         // 餐盒费
-                        'STORE_ORDER.PAID_MONEY'         : self.order['STORE_ORDER.PAID_MONEY'],
+                        'STORE_ORDER.BOX_MONEY'         : self.order['STORE_ORDER.BOX_MONEY'],
                         'STORE_ORDER.PAID_MONEY'         : self.order['STORE_ORDER.PAID_MONEY'],
                         'STORE_ORDER.UID'                : self.order['STORE_ORDER.UID'],
                         'STORE_ORDER.ORDER_SOURCE_ADDR'  : self.order['STORE_ORDER.ORDER_SOURCE_ADDR'],
@@ -523,25 +524,18 @@
                         'STORE_ORDER.MEMB_PHONE'         : self.order['STORE_ORDER.MEMB_PHONE'], 
                     }
                     if(typeof(getEvent.printFrontTakeOutInfo) == "function"){
-                        getEvent.printFrontTakeOutInfo(obj,function(res){})
-                        // if(self.list.indexOf('front') != -1){
-                        //      getEvent.printFrontTakeOutInfo(obj,function(res){})
-                        // }
+                        getEvent.printFrontTakeOutInfo(obj,function(res){
+                            // modal.alert({message:res})
+                        })
                     }
-                    // if(typeof(getEvent.backPrint) == "function"){
-                    //     if(self.list.indexOf('other') != -1){
-                    //          getEvent.backPrint(obj,function(res){})
-                    //     }
-                       
-                    // }
-                // })
+                    
                 
             },
             agreeRefund(){
-                this.$emit("agreeTip",true,this['STORE_ORDER.ORDER_ID'])
+                this.$emit("agreeTip",true,this.order['STORE_ORDER.ORDER_ID'],this.order['STORE_ORDER.ORDER_SOURCE'])
             },
             rejectRefund(){
-                this.$emit("rejectTip",true,this['STORE_ORDER.ORDER_ID'])
+                this.$emit("rejectTip",true,this.order['STORE_ORDER.ORDER_ID'],this.order['STORE_ORDER.ORDER_SOURCE'])
             },
         }
     }

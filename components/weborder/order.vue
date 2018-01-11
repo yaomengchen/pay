@@ -188,10 +188,12 @@
                 self.focusOrder = 0
                 self.nowIndex = 0
                 self.pageNumber = 1
-                self.getData(self.api.today + self.pageNumber,callback)
+                console.log(11)
+                self.getData(self.api.today + self.pageNumber,callback);
             },
             getData(api,callback){
                 var self = this
+
                 stream.fetch({
                     'method':'GET',
                     'url':api + '&STORE_ORDER.STORE_ID=' + self.storeid
